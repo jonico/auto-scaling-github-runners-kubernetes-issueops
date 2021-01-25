@@ -1,0 +1,32 @@
+# runnerdeployment.yaml
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: actions-runner-deployment
+spec:
+  template:
+    spec:
+      organization: Hyrule
+      labels:
+        - zelda
+        - kubernetes
+      group: default
+      image: jonico/actions-runner:latest
+
+      # Adjust if you have a very shaky network connection
+      tolerations:
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 10
+
+      # Adjust resources to your needs
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "200m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+
+      dockerEnabled: true

@@ -1,0 +1,23 @@
+# runnerdeployment.yaml
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: actions-runner-deployment
+spec:
+  template:
+    spec:
+      organization: hyrule
+      labels:
+        - link
+        - kubernetes
+      group: default
+      image: jonico/summerwind-actions-runner-with-stress:latest
+      # Adjust resources to your needs
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "150m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+      dockerEnabled: true

@@ -1,0 +1,233 @@
+name: "Approve self-hosted runner scale set deletion/archival request"
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  prechecks:
+    name: "Check pre-conditions for self hosted runner scale set deletion"
+    if: github.event.issue.pull_request != null && startsWith(github.event.issue.title, 'Delete and archive self hosted runner scale set for env ') && startsWith(github.event.comment.body, '/approve')
+    runs-on: self-hosted
+    outputs:
+      environment: ${{ steps.prechecks.outputs.environment }}
+      cloud: ${{ steps.prechecks.outputs.cloud }}
+    steps:
+    - name: Debug
+      uses: actions/github-script@v3
+      with:
+        script: console.log(JSON.stringify(context, null, 2));
+
+    - name: Parse issue body
+      id: issue_body
+      uses: peter-murray/issue-body-parser-action@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        issue_id: ${{ github.event.issue.number }}
+
+    - name: Check permissions and scan environment
+      id: prechecks
+      uses: actions/github-script@v3
+      env:
+        title: ${{ github.event.issue.title }}
+        comment: ${{ github.event.issue.body }}
+        ISSUE_PAYLOAD: ${{ steps.issue_body.outputs.payload }}
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          const issuePayload = JSON.parse(process.env.ISSUE_PAYLOAD);
+
+          const runner = {
+            environment: issuePayload.environment,
+            cloud: issuePayload.cloud,
+          };
+
+          if (! /^[a-zA-Z0-9_]+$/.test(runner.environment)) {
+            const error = `The name of the environment contains illegal characters: ${runner.environment}`;
+            core.error(error);
+            core.setFailed(error);
+          }
+
+          if (! /^[a-zA-Z0-9_]+$/.test(runner.cloud)) {
+            const error = `The name of the cloud contains illegal characters: ${runner.cloud}`;
+            core.error(error);
+            core.setFailed(error);
+          }
+
+          core.info("environment: " + runner.environment)
+          core.info("cloud: " + runner.cloud)
+
+          const permissionRes = await github.repos.getCollaboratorPermissionLevel(
+            {
+              ...context.repo,
+              username: context.actor
+            }
+          )
+          if (permissionRes.status !== 200) {
+            message = 'Permission check returns non-200 status: ${permissionRes.status}'
+            core.setOutput('error', message)
+            throw new Error(message)
+          }
+          const actorPermission = permissionRes.data.permission
+          if (!['admin', 'write'].includes(actorPermission)) {
+              message = '👋  @' + context.actor + ', seems as if you have not admin/write permission to /approve this PR, permissions: ${actorPermission}'
+              core.setOutput('error', message)
+              throw new Error(message)
+          }
+          core.setOutput('environment', runner.environment)
+          core.setOutput('cloud', runner.cloud)
+
+    - name: Pre-Check-Failed
+      id: precheck-failed
+      if: failure()
+      uses: actions/github-script@v3
+      env:
+        message: ${{steps.prechecks.outputs.error}}
+      with:
+        github-token: ${{secrets.GITHUB_TOKEN}}
+        script: |
+          const { message } = process.env;
+          github.issues.createComment({
+            ...context.repo,
+            issue_number: context.issue.number,
+            body: message
+          })
+
+  act-on-deprovisioning-request:
+    name: "Deprovision self hosted runner scale set"
+    needs: [prechecks]
+    runs-on: ${{needs.prechecks.outputs.cloud}}
+    steps:
+      - name: Acknowledge self hosted runner deprovisioning request
+        id: acknowledge
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{secrets.GITHUB_TOKEN}}
+          script: |
+            const log_url = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+            const { environment, cloud } = process.env;
+            pr = await github.pulls.get(
+              {
+                ...context.repo,
+                pull_number: context.issue.number
+              }
+            )
+
+            if (pr.status !== 200) {
+              message = 'Could not retrieve PR info: ${permissionRes.status}'
+              core.setOutput('error', message)
+              throw new Error(message)
+            }
+
+            if (!pr.data.mergeable) {
+              message = 'This PR is currently not mergeable, please update it with the latest changes from the target branch.'
+              core.setOutput('error', message)
+              throw new Error(message)
+            }
+
+            github.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: '👋  @' + context.actor + ' deprovisioning self hosted runner scale set environment ' + environment + ' now, you can watch the progress [here](' + log_url + ') ...'
+            })
+
+            core.setOutput('ref', pr.data.head.ref)
+        env:
+          environment: ${{needs.prechecks.outputs.environment}}
+          cloud: ${{needs.prechecks.outputs.cloud}}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ steps.acknowledge.outputs.ref }}
+
+      - name: Set up Cloud SDK
+        id: setup-cloud-sdk-gcp
+        if: needs.prechecks.outputs.cloud == 'gcp'
+        uses: google-github-actions/setup-gcloud@master
+        with:
+          project_id: ${{ secrets.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - id: get-credentials-gcp
+        if: needs.prechecks.outputs.cloud == 'gcp'
+        uses: google-github-actions/get-gke-credentials@main
+        with:
+          cluster_name: ${{secrets.CLUSTER_NAME}}
+          location: ${{secrets.CLUSTER_LOCATION}}
+
+      - id: install-tools-gcp
+        if: needs.prechecks.outputs.cloud == 'gcp'
+        name: "Install kubectl and kustomize"
+        run: |
+          gcloud components install kubectl kustomize
+
+      - name: Apply changes
+        id: apply-changes
+        env:
+          environment: ${{needs.prechecks.outputs.environment}}
+          cloud: ${{needs.prechecks.outputs.cloud}}
+        run: |
+          if [ $cloud == "raspi" ]
+          then
+            export KUBECONFIG=$HOME/kubeconfig
+          fi
+          kustomize build actions-runner-envs-archived/${environment} > ${environment}.yaml
+          IFS=";" CONFIG_APPLIED=$(cat ${environment}.yaml)
+          echo "Going to delete the following Kubernetes configuration: "
+          echo $CONFIG_APPLIED
+          kubectl delete namespace "github-actions-runner-${environment}"
+          CONFIG_APPLIED="${CONFIG_APPLIED//'%'/'%25'}"
+          CONFIG_APPLIED="${CONFIG_APPLIED//$'\n'/'%0A'}"
+          CONFIG_APPLIED="${CONFIG_APPLIED//$'\r'/'%0D'}"
+          echo "::set-output name=config-applied::$CONFIG_APPLIED"
+
+      - name: Deprovisioning Failed
+        id: deprovisioning-failed
+        if: failure()
+        uses: actions/github-script@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const log_url = `${process.env.GITHUB_SERVER_URL}/${context.repo.owner}/${context.repo.repo}/actions/runs/${process.env.GITHUB_RUN_ID}`
+
+            github.issues.createComment({
+              ...context.repo,
+              issue_number: ${{ github.event.issue.number }},
+              body: `Self-hosted runner deprovision request failed :cry:. [View error logs](${ log_url}).`
+            })
+
+      - name: Deprovisioning Succeeded
+        id: deprovisioning-succeeded
+        if: success()
+        uses: actions/github-script@v3
+        env:
+          CONFIG_APPLIED: ${{ steps.apply-changes.outputs.config-applied }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const commentBody = `\
+            ### :computer: Self-hosted runner configuration deleted successfully :runner:
+
+            <details>
+            <summary>🚀 Configuration removed</summary>
+
+            \`\`\`
+            ${process.env.CONFIG_APPLIED}
+            \`\`\`
+            </details>
+
+            Merging this PR now ...
+            To create a new scale set configuration, open another issue.
+            `;
+
+            await github.issues.createComment({
+              ...context.repo,
+              issue_number: ${{ github.event.issue.number }},
+              body: commentBody
+            })
+
+            github.pulls.merge({
+              ...context.repo,
+              pull_number: context.issue.number
+            });

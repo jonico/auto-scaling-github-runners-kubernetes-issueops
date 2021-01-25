@@ -1,0 +1,9 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: actions-runner-autoscaler
+spec:
+  minReplicas: ${RUNNER_MIN_REPLICAS}
+  maxReplicas: ${RUNNER_MAX_REPLICAS}
+  scaleTargetRef:
+      name: actions-runner-deployment-${RUNNER_ENVIRONMENT}

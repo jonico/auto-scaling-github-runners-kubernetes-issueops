@@ -1,0 +1,33 @@
+name: Scaling test for runner env massive
+
+on:
+  workflow_dispatch:
+    inputs:
+      numberJobs:
+        description: 'Number of parallel jobs (should stay below 100)'
+        required: true
+        default: '64'
+
+jobs:
+  generate-matrix:
+    name: "Generate jobs for massive"
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    runs-on: [ self-hosted ]
+    steps:
+      - name: generate-matrix
+        id: generate-matrix
+        run: echo "::set-output name=matrix::[`seq -s , ${{ github.event.inputs.numberJobs }}`]"
+
+  stress:
+    name: "Stress tests for massive"
+    runs-on: [ massive ]
+    needs: [generate-matrix]
+
+    strategy:
+      matrix:
+        job-number: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+
+    steps:
+    - name: Stress test ${{ matrix.job-number }} of env massive
+      run: echo "Matrix version ${{ matrix.job-number }}" && sleep $((RANDOM%120+60))

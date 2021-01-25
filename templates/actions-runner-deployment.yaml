@@ -1,0 +1,11 @@
+# runnerdeployment.yaml
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: actions-runner-deployment
+spec:
+  template:
+    spec:
+      organization: baseline
+      image: jonico/summerwind-actions-runner-with-stress:latest
+      group: kubernetes

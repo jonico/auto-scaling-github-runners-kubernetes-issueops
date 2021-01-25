@@ -1,0 +1,40 @@
+# runnerdeployment.yaml
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: actions-runner-deployment
+spec:
+  template:
+    spec:
+      organization: ${RUNNER_ORGANIZATION}
+      labels:
+        - ${RUNNER_ENVIRONMENT}
+        - kubernetes
+      group: ${RUNNER_GROUP}
+      image: ${RUNNER_IMAGE}
+
+      # Adjust if you have a very shaky network connection
+      tolerations:
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+          tolerationSeconds: 10
+
+      # Adjust resources to your needs
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "50m"
+        limits:
+          memory: "1Gi"
+          cpu: "1000m"
+
+      dockerEnabled: ${RUNNER_DOCKER_ENABLED}
+
+      # DELETE THIS LAST SECTION IF DOCKER ENABLED IS SET TO TRUE
+      volumeMounts:
+      - mountPath: /runner
+        name: runner
+      volumes:
+      - name: runner
+        emptyDir: {}

@@ -1,0 +1,9 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: HorizontalRunnerAutoscaler
+metadata:
+  name: actions-runner-autoscaler
+spec:
+  minReplicas: 2
+  maxReplicas: 15
+  scaleTargetRef:
+      name: actions-runner-deployment-zelda
