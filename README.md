@@ -1,5 +1,7 @@
 # setup-self-hosted-runner-kubernetes-cluster
 
+[![awesome-runners](https://img.shields.io/badge/listed%20on-awesome--runners-blue.svg)](https://github.com/jonico/awesome-runners)
+
 IssueOps example on how to set up an autoscaling, self-hosted runner fleet in kubernetes using [summerwind/actions-runner-controller](https://github.com/summerwind/actions-runner-controller).
 
 In order to setup or modify an auto-scaling runner set, just [create an issue](https://octodemo.com/baseline/setup-self-hosted-runner-kubernetes-cluster/issues/new/choose):
