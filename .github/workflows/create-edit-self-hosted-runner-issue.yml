@@ -122,7 +122,7 @@ jobs:
           RUNNER_CLOUD: ${{ steps.validate_runner_params.outputs.cloud }}
         run: |
           mkdir -p actions-runner-envs/$RUNNER_ENVIRONMENT
-          for i in `ls actions-runner-envs/default/`; do envsubst < actions-runner-envs/default/$i > actions-runner-envs/$RUNNER_ENVIRONMENT/$i; done
+          for i in `ls actions-runner-envs/template-env/`; do envsubst < actions-runner-envs/template-env/$i > actions-runner-envs/$RUNNER_ENVIRONMENT/$i; done
 
       - name: Create PR
         id: create_pr
