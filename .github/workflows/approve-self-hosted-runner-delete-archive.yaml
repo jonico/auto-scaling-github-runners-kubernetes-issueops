@@ -162,16 +162,49 @@ jobs:
         run: |
           gcloud components install kubectl kustomize
 
+      - id: install-kube-tools
+        if: needs.prechecks.outputs.cloud == 'aws'
+        name: "Install kube-tools"
+        uses: yokawasa/action-setup-kube-tools@v0.3.0
+        with:
+          kubectl: '1.17.1'
+          kustomize: '3.7.0'
+
+      - id: install-aws-cli
+        if: needs.prechecks.outputs.cloud == 'aws'
+        name: "Install aws cli"
+        run: |
+          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip awscliv2.zip
+          sudo ./aws/install --update
+
+      - id: get-credentials-aws
+        if: needs.prechecks.outputs.cloud == 'aws'
+        name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{secrets.CLUSTER_LOCATION}}
+
       - name: Apply changes
         id: apply-changes
         env:
           environment: ${{needs.prechecks.outputs.environment}}
           cloud: ${{needs.prechecks.outputs.cloud}}
+          CLUSTER_NAME: ${{secrets.CLUSTER_NAME}}
+          REGION: ${{secrets.CLUSTER_LOCATION}}
         run: |
           if [ $cloud == "raspi" ]
           then
             export KUBECONFIG=$HOME/kubeconfig
           fi
+
+          if [ $cloud == "aws" ]
+          then
+            aws eks --region $REGION update-kubeconfig --name $CLUSTER_NAME  
+          fi
+
           kustomize build actions-runner-envs-archived/${environment} > ${environment}.yaml
           IFS=";" CONFIG_APPLIED=$(cat ${environment}.yaml)
           echo "Going to delete the following Kubernetes configuration: "
