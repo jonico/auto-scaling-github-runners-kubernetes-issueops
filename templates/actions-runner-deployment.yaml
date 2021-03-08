@@ -6,6 +6,5 @@ metadata:
 spec:
   template:
     spec:
-      organization: baseline
       image: jonico/summerwind-actions-runner-with-stress:latest
       group: kubernetes
