@@ -4,7 +4,7 @@
 
 IssueOps example on how to set up an autoscaling, self-hosted runner fleet in kubernetes using [summerwind/actions-runner-controller](https://github.com/summerwind/actions-runner-controller).
 
-[![This is a demo of https://github.com/jonico/auto-scaling-github-runners-kubernetes-issueops showing how to set up auto-scaling, self-hosted GitHub Action runners in Kubernetes using IssueOps and https://github.com/summerwind/actions-runner-controller](http://img.youtube.com/vi/ktWHgfMvS7M/0.jpg)](http://www.youtube.com/watch?v=ktWHgfMvS7M "IssueOps Demo")
+[Watch a three minute demo](http://www.youtube.com/watch?v=ktWHgfMvS7M) to see what this project can do for you.
 
 
 In order to setup or modify an auto-scaling runner set, just [create an issue](https://octodemo.com/baseline/setup-self-hosted-runner-kubernetes-cluster/issues/new/choose):
