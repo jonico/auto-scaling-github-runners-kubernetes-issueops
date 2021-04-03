@@ -31,7 +31,7 @@ spec:
 
       dockerEnabled: ${RUNNER_DOCKER_ENABLED}
 
-      # DELETE THIS LAST SECTION IF DOCKER ENABLED IS SET TO TRUE
+      # DELETE THIS LAST SECTION IF DOCKER ENABLED IS SET TO TRUE OR YOU ARE USING actions-runner-controller version 0.18+
       volumeMounts:
       - mountPath: /runner
         name: runner
